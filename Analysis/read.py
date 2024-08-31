@@ -19,9 +19,11 @@ def screenshot():
 #Takes an image like the one supplied by screenshot
 def storeshot(img):
     currentDirectory = r'Analysis\storedImages'
-    print(os.listdir(currentDirectory))
-    latest = int((os.listdir(currentDirectory)[-1]).removesuffix('.jpg'))
+
+    if os.listdir(currentDirectory) != []:
+        latest = int((os.listdir(currentDirectory)[-1]).removesuffix('.jpg'))
+    else:
+         latest = - 1
     name = latest + 1
     cv2.imwrite(currentDirectory + "/" + str(name) + ".jpg", img)
-
 
