@@ -2,6 +2,9 @@ import readScreen
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import time
+import cache
+import os
 def detectSquare():
     img = readScreen.screenshot()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) 
@@ -45,38 +48,69 @@ def detectSquare():
     cv2.waitKey(0) 
     cv2.destroyAllWindows() 
 
-def detectImage(img1, img2):
-    # Convert both images to grayscale (if not already)
-    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+def detectImageMultiScale(img1, img2, name ,scale_start=0.4, scale_end=1.3, scale_step=0.1, threshold=0.81):
+    # Convert img1 to grayscale
+    #img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 
-    # Ensure img2 (the icon) is smaller than img1 (the desktop screenshot)
-    if img2.shape[0] > img1.shape[0] or img2.shape[1] > img1.shape[1]:
-        print("Icon is larger than the screenshot. Ensure img2 is smaller.")
-        return
+    found = 0  # Counter to track matches
 
-    # Apply template matching
-    result = cv2.matchTemplate(img1, img2, cv2.TM_CCOEFF_NORMED)
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-    threshold = 0.8  # Higher threshold means stricter matching
+    # Loop over scales from scale_start to scale_end
+    for scale in np.arange(scale_start, scale_end, scale_step):
+        # Create a fresh copy of the original img1 for each scale iteration
+        img_copy = img1.copy()
 
-    if max_val >= threshold:
-        print(f"Match found with confidence: {max_val}")
+        # Resize img2 (the template) according to the current scale
+        #print(img2.shape, img2.shape[1])
+        cropped = img2[10:110, 10:110]
+        cv2.imshow("",cropped)
+        cv2.waitKey(10)
+        img2r = cropped
+        
+        scaled_img2 = cv2.resize(img2r, (int(img2r.shape[1] * scale), int(img2r.shape[0] * scale)))
 
-        top_left = max_loc
-        h, w = img2.shape
-        bottom_right = (top_left[0] + w, top_left[1] + h)
-        cv2.rectangle(img1, top_left, bottom_right, (255, 255, 255), 2)
-        img1_resized = cv2.resize(img1, (1920,1080))
+        # If the scaled template size is larger than img1, skip this iteration
+        if scaled_img2.shape[0] > img1_gray.shape[0] or scaled_img2.shape[1] > img1_gray.shape[1]:
+            continue
+#TM_CCOEFF_NORMED
+        # Apply template matching
+        result = cv2.matchTemplate(img1_gray, scaled_img2, cv2.TM_CCOEFF_NORMED)
+        
+        # Find all locations with match confidence above the threshold
+        match_locations = np.where(result >= threshold)
+        
+        h, w = scaled_img2.shape
 
-        cv2.imshow("Detected Icon", img1_resized)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-    else:
-        print("Discord icon not detected.")
+        # Draw rectangles for all matches
+        for (y, x) in zip(match_locations[0], match_locations[1]):
+            top_left = (x, y)
+            bottom_right = (top_left[0] + w, top_left[1] + h)
+            cv2.rectangle(img_copy, top_left, bottom_right, (255, 255, 255), 2)
+            found += 1
+
+        # Show the image for this scale with the current matches
+        if len(match_locations[0]) > 0:
+            print(f"Matches found at scale {scale:.2f}: {len(match_locations[0])} match(es).", name)
+            img1_resized = cv2.resize(img_copy, (1920, 1080))
+            cv2.imshow(f"Detected Icon(s) at scale {scale:.2f}", img1_resized)
+            cv2.waitKey(8000)
+            cv2.destroyAllWindows()
+            time.sleep(1)
+
+    if found == 0:
+        print(name)
+        pass
+        #print("No matches found.")
 
 # Test the function
-icon = cv2.imread('C:/Users/Trevor/Desktop/Bots/Analysis/trainingImages/discordIcon.png', cv2.IMREAD_GRAYSCALE)
-Screen = np.array(readScreen.screenshotRAW())
+
+
 
 # Call the function
-detectImage(Screen, icon)
+champnames = os.listdir("Analysis/trainingImages")
+#print(champnames)
+for x in champnames:
+    iconName = x
+    Screen = np.array(readScreen.screenshotRAW())
+    #iconName = 'malphite'
+    icon = cv2.imread('C:/Users/Trevor/Desktop/Bots/Analysis/trainingImages/'+iconName, cv2.IMREAD_GRAYSCALE)
+    detectImageMultiScale(Screen, icon, x)
